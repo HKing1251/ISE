@@ -67,17 +67,24 @@ def load_image(file_path, fallback_path=None):
 
 # Load and scale all arrow images (default and glowing)
 def load_arrow_images():
+    def scaled_image(path):
+        return pygame.transform.scale(load_image(path), (ARROW_SIZE, ARROW_SIZE))
+
     arrows, glowing = {}, {}
-    for direction, (default_file, glow_file) in ARROW_IMAGE_MAPPING.items():
+    for direction, (default_path, glow_path) in ARROW_IMAGE_MAPPING.items():
         try:
-            print(f"Loading: {default_file} and {glow_file}")  # Debug
-            normal_img = load_image(default_file)
-            glow_img = load_image(glow_file)
+            arrows[direction] = scaled_image(default_path)
+            glowing[direction] = scaled_image(glow_path)
         except Exception as e:
-            raise SystemExit(f"Error loading arrow images for {direction}: {e}")
-        arrows[direction] = pygame.transform.scale(normal_img, (ARROW_SIZE, ARROW_SIZE))
-        glowing[direction] = pygame.transform.scale(glow_img, (ARROW_SIZE, ARROW_SIZE))
+            raise SystemExit(f"Error loading {direction} arrows: {e}")
     return arrows, glowing
+
+# Render text in the center of the screen
+def render_text_centered(screen, text, font, color, y_offset):
+    rendered = font.render(text, True, color)
+    x = (SCREEN_WIDTH - rendered.get_width()) // 2
+    screen.blit(rendered, (x, y_offset))
+
 
 # === Note Class ===
 class Note:
@@ -125,6 +132,8 @@ def show_menu(screen, clock, font, big_font):
     menu_active = True
     selected_option = 0
     options = []
+
+    
     
     # Build options list based on unlocked levels
     for level_id, level_data in sorted(LEVELS.items()):
@@ -138,13 +147,11 @@ def show_menu(screen, clock, font, big_font):
     while menu_active:
         screen.fill(BLACK)
         
-        # Draw title
-        title = big_font.render("RHYTHM GAME", True, BLUE)
-        screen.blit(title, (SCREEN_WIDTH // 2 - title.get_width() // 2, 50))
-        
+        # Render title
+        render_text_centered(screen, "Funky Flow Friday ", big_font, BLUE, 50)
+
         # Instructions
-        instructions = font.render("Choose a level with UP/DOWN keys, press ENTER to select", True, WHITE)
-        screen.blit(instructions, (SCREEN_WIDTH // 2 - instructions.get_width() // 2, 120))
+        render_text_centered(screen, "Choose a level with UP/DOWN keys, press ENTER", font, WHITE, 120)
         
         # Draw menu options
         for i, (level_id, text) in enumerate(options):
