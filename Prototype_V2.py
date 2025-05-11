@@ -5,15 +5,15 @@ import sys
 import os
 from pathlib import Path
 
-# Force the working directory to the script's location
+# Set the working directory to the script's location
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
-# Constants
+# === Constants ===
 SCREEN_WIDTH, SCREEN_HEIGHT = 800, 600
 ARROW_SIZE = 80
 ARROW_SPEED = 5
 ARROW_SPACING = 100
-TARGET_Y = 100
+TARGET_Y = 100  # Y position where arrows should be hit
 NOTE_INTERVAL_START = 1.0
 NOTE_INTERVAL_MIN = 0.3
 GLOW_DURATION = 15
@@ -22,7 +22,7 @@ WIN_THRESHOLD = 1000
 MAX_HEALTH = 100
 INITIAL_HEALTH = 50
 
-# Colors
+# === Colors ===
 BLACK = (0, 0, 0)
 WHITE = (255, 255, 255)
 GRAY = (100, 100, 100)
@@ -32,7 +32,7 @@ ORANGE = (255, 165, 0)
 RED = (255, 0, 0)
 BLUE = (0, 191, 255)
 
-# Key Bindings
+# === Key Bindings for Direction Arrows ===
 KEY_BINDINGS = {
     pygame.K_LEFT: "left",
     pygame.K_DOWN: "down",
@@ -40,6 +40,7 @@ KEY_BINDINGS = {
     pygame.K_RIGHT: "right"
 }
 
+# Mapping of directions to image paths
 ARROW_IMAGE_MAPPING = {
     "left": ["assets/arrowSkinLeftDefault.png", "assets/arrowSkinLeftGlow.png"],
     "down": ["assets/arrowSkinDownDefault.png", "assets/arrowSkinDownGlow.png"],
@@ -47,6 +48,7 @@ ARROW_IMAGE_MAPPING = {
     "right": ["assets/arrowSkinRightDefault.png", "assets/arrowSkinRightGlow.png"]
 }
 
+# Load an image, fall back if needed
 def load_image(file_path, fallback_path=None):
     try:
         return pygame.image.load(file_path).convert_alpha()
@@ -55,11 +57,12 @@ def load_image(file_path, fallback_path=None):
             return pygame.image.load(fallback_path).convert_alpha()
         raise
 
+# Load and scale all arrow images (default and glowing)
 def load_arrow_images():
     arrows, glowing = {}, {}
     for direction, (default_file, glow_file) in ARROW_IMAGE_MAPPING.items():
         try:
-            print(f"Loading: {default_file} and {glow_file}")  # Debug line
+            print(f"Loading: {default_file} and {glow_file}")  # Debug
             normal_img = load_image(default_file)
             glow_img = load_image(glow_file)
         except Exception as e:
@@ -68,7 +71,7 @@ def load_arrow_images():
         glowing[direction] = pygame.transform.scale(glow_img, (ARROW_SIZE, ARROW_SIZE))
     return arrows, glowing
 
-
+# === Note Class ===
 class Note:
     def __init__(self, direction, x):
         self.direction = direction
@@ -79,14 +82,14 @@ class Note:
     def update(self):
         self.y -= ARROW_SPEED
         if self.y < TARGET_Y - 50 and not self.hit:
-            self.missed = True
+            self.missed = True  # Mark note as missed if it goes past the target
 
     def draw(self, screen, image):
         if not self.hit and not self.missed:
             rect = image.get_rect(center=(self.x, self.y))
             screen.blit(image, rect)
 
-
+# === Main Game Loop ===
 def main():
     pygame.init()
     screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
@@ -97,6 +100,7 @@ def main():
 
     arrows, glowing_arrows = load_arrow_images()
 
+    # Set x positions for each arrow target
     targets = {
         "left": SCREEN_WIDTH // 2 - ARROW_SPACING * 1.5,
         "down": SCREEN_WIDTH // 2 - ARROW_SPACING * 0.5,
@@ -104,10 +108,12 @@ def main():
         "right": SCREEN_WIDTH // 2 + ARROW_SPACING * 1.5
     }
 
+    # Glow state and timers for each arrow direction
     target_arrows = {
         dir: {"x": x, "glow": False, "timer": 0} for dir, x in targets.items()
     }
 
+    # Game state variables
     notes, score, combo, misses, health = [], 0, 0, 0, INITIAL_HEALTH
     game_over = game_won = paused = False
     current_rating = None
@@ -115,6 +121,7 @@ def main():
     last_note_time = time.time()
     note_interval = NOTE_INTERVAL_START
 
+    # Pre-rendered rating texts
     ratings = {
         "perfect": font.render("PERFECT!", True, GREEN),
         "good": font.render("GOOD", True, YELLOW),
@@ -122,6 +129,7 @@ def main():
         "miss": font.render("MISS", True, RED)
     }
 
+    # === Game Loop ===
     running = True
     while running:
         for e in pygame.event.get():
@@ -131,7 +139,7 @@ def main():
                 if e.key == pygame.K_ESCAPE:
                     running = False
                 if (game_over or game_won) and e.key == pygame.K_r:
-                    return main()
+                    return main()  # Restart game
                 if not (game_over or game_won):
                     direction = KEY_BINDINGS.get(e.key)
                     if direction:
@@ -167,24 +175,28 @@ def main():
                             rating_timer = RATING_DISPLAY_TIME
                             health = max(0, health - 5)
 
+        # Check win/loss conditions
         if score >= WIN_THRESHOLD:
             game_won, paused = True, True
         if health <= 0:
             game_over, paused = True, True
 
+        # Spawn notes at intervals
         if not paused:
             if time.time() - last_note_time > note_interval:
                 direction = random.choice(list(targets.keys()))
                 notes.append(Note(direction, targets[direction]))
                 last_note_time = time.time()
-                note_interval = max(NOTE_INTERVAL_MIN, note_interval * 0.99)
+                note_interval = max(NOTE_INTERVAL_MIN, note_interval * 0.99)  # Accelerate note speed
 
+        # Update glow timers
         for ta in target_arrows.values():
             if ta["timer"] > 0:
                 ta["timer"] -= 1
                 if ta["timer"] == 0:
                     ta["glow"] = False
 
+        # Update and remove notes
         for note in notes[:]:
             note.update()
             if note.missed:
@@ -199,45 +211,55 @@ def main():
         if rating_timer > 0:
             rating_timer -= 1
 
+        # === Drawing Section ===
         screen.fill(BLACK)
 
+        # Draw target arrows
         for dir, data in target_arrows.items():
             image = glowing_arrows[dir] if data["glow"] else arrows[dir]
             rect = image.get_rect(center=(data["x"], TARGET_Y))
             screen.blit(image, rect)
             pygame.draw.line(screen, GRAY, (data["x"] - ARROW_SIZE, TARGET_Y), (data["x"] + ARROW_SIZE, TARGET_Y), 2)
 
+        # Draw falling notes
         for note in notes:
             note.draw(screen, arrows[note.direction])
 
+        # UI: Score, combo, misses
         screen.blit(font.render(f"Score: {score}/{WIN_THRESHOLD}", True, WHITE), (20, 20))
         screen.blit(font.render(f"Combo: {combo}", True, WHITE), (20, 60))
         screen.blit(font.render(f"Misses: {misses}", True, WHITE), (20, 100))
 
+        # Health bar
         health_width = int((health / MAX_HEALTH) * 200)
         pygame.draw.rect(screen, GRAY, (SCREEN_WIDTH - 220, 20, 200, 20))
         pygame.draw.rect(screen, GREEN, (SCREEN_WIDTH - 220, 20, health_width, 20))
 
+        # Progress bar toward win
         score_width = int(min(1.0, score / WIN_THRESHOLD) * 200)
         pygame.draw.rect(screen, GRAY, (SCREEN_WIDTH - 220, 50, 200, 20))
         pygame.draw.rect(screen, BLUE, (SCREEN_WIDTH - 220, 50, score_width, 20))
 
+        # Display rating
         if rating_timer > 0 and current_rating:
             rect = current_rating.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2))
             screen.blit(current_rating, rect)
 
+        # Game over screen
         if game_over:
             overlay = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
             overlay.fill((0, 0, 0, 150))
             screen.blit(overlay, (0, 0))
             screen.blit(big_font.render("GAME OVER", True, RED), (SCREEN_WIDTH // 2 - 150, SCREEN_HEIGHT // 2 - 50))
             screen.blit(font.render("Press R to restart or ESC to quit", True, WHITE), (SCREEN_WIDTH // 2 - 170, SCREEN_HEIGHT // 2 + 10))
+        # Win screen
         elif game_won:
             overlay = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
             overlay.fill((0, 0, 0, 150))
             screen.blit(overlay, (0, 0))
             screen.blit(big_font.render("YOU WIN!", True, GREEN), (SCREEN_WIDTH // 2 - 150, SCREEN_HEIGHT // 2 - 50))
             screen.blit(font.render("Press R to play again or ESC to quit", True, WHITE), (SCREEN_WIDTH // 2 - 190, SCREEN_HEIGHT // 2 + 10))
+        # Instruction line
         else:
             instructions = font.render("Press arrow keys when notes align with targets", True, WHITE)
             screen.blit(instructions, instructions.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT - 30)))
@@ -248,6 +270,6 @@ def main():
     pygame.quit()
     sys.exit()
 
-
+# Run the game
 if __name__ == "__main__":
     main()
