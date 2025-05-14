@@ -4,13 +4,106 @@ import time
 import sys
 import os
 import json
+import pygame.mixer
+
 from pathlib import Path
 
 # Set the working directory to the script's location
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
+def show_intro_screen(screen):
+    import pygame
+    import sys
+
+    pygame.mixer.music.load('BackgroundTest/SoulChef.mp3')
+    pygame.mixer.music.set_volume(0.5)
+    pygame.mixer.music.play(-1)
+
+    screen_width, screen_height = screen.get_size()
+
+    # Load and scale background images to fit screen
+    bg_img_back_original = pygame.image.load('assets/MainMenuSky.png').convert()
+    bg_img_back = pygame.transform.scale(bg_img_back_original, (screen_width, screen_height))
+
+    bg_img_front = pygame.image.load('assets/MainMenuScreen.png').convert_alpha()
+    bg_img_front = pygame.transform.scale(bg_img_front, (screen_width, screen_height))
+
+    # Dark overlay to soften front UI
+    dark_overlay = pygame.Surface((screen_width, screen_height), pygame.SRCALPHA)
+    dark_overlay.fill((0, 0, 0, 160))
+    darkened_front = bg_img_front.copy()
+    darkened_front.blit(dark_overlay, (0, 0))
+
+    # Scrolling sky setup
+    bg_x = 0
+    scroll_speed = 0.5  # pixels/frame
+
+    # Fonts
+    font = pygame.font.SysFont("Comic Sans MS", 60, bold=True)
+    small_font = pygame.font.SysFont("Arial", 30)
+    prompt = small_font.render("Press any key to continue...", True, (180, 180, 180))
+
+    clock = pygame.time.Clock()
+    running = True
+
+    while running:
+        # Scroll sky background
+        bg_x = (bg_x + scroll_speed) % screen_width
+        screen.blit(bg_img_back, (-bg_x, 0))
+        screen.blit(bg_img_back, (screen_width - bg_x, 0))
+
+        # Draw static darkened front frame
+        screen.blit(darkened_front, (0, 0))
+
+        # === Draw Neon Title ===
+        title_texts = [
+            ("F", (255, 50, 50)),         # Neon red
+            ("unky ", (255, 255, 255)),   # White
+            ("F", (50, 255, 255)),        # Neon cyan
+            ("low ", (255, 255, 255)),    # White
+            ("F", (200, 50, 255)),        # Neon violet
+            ("riday", (255, 255, 255)),   # White
+        ]
+
+        title_surfaces = []
+        total_width = 0
+        for text, color in title_texts:
+            surf = font.render(text, True, color)
+            shadow = font.render(text, True, (30, 30, 30))  # Soft glow shadow
+            title_surfaces.append((surf, shadow))
+            total_width += surf.get_width()
+
+        x_offset = (screen_width - total_width) // 2
+        y_offset = 100
+
+        for surf, shadow in title_surfaces:
+            # Glow effect: draw shadow slightly offset
+            screen.blit(shadow, (x_offset + 2, y_offset + 2))
+            screen.blit(surf, (x_offset, y_offset))
+            x_offset += surf.get_width()
+
+        # Draw prompt text
+        screen.blit(prompt, ((screen_width - prompt.get_width()) // 2, 180))
+
+        # Handle input
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.mixer.music.stop()
+                pygame.quit()
+                sys.exit()
+            elif event.type == pygame.KEYDOWN:
+                running = False
+
+        pygame.display.flip()
+        clock.tick(60)
+
+    pygame.mixer.music.stop()
+
+
+
+
 # === Constants ===
-SCREEN_WIDTH, SCREEN_HEIGHT = 800, 600
+SCREEN_WIDTH, SCREEN_HEIGHT = 1000, 800
 ARROW_SIZE = 80
 ARROW_SPACING = 100
 TARGET_Y = 100  # Y position where arrows should be hit
@@ -22,8 +115,8 @@ INITIAL_HEALTH = 50
 # === Level Configuration ===
 LEVELS = {
     1: {"name": "Level 1", "win_threshold": 1000, "arrow_speed": 5, "note_interval_start": 1.0, "note_interval_min": 0.3, "unlocked": True},
-    2: {"name": "Level 2", "win_threshold": 1500, "arrow_speed": 7, "note_interval_start": 0.8, "note_interval_min": 0.25, "unlocked": False},
-    3: {"name": "Level 3", "win_threshold": 3000, "arrow_speed": 9, "note_interval_start": 0.6, "note_interval_min": 0.2, "unlocked": False}
+    2: {"name": "Level 2", "win_threshold": 1500, "arrow_speed": 9, "note_interval_start": 0.8, "note_interval_min": 0.25, "unlocked": False},
+    3: {"name": "Level 3", "win_threshold": 3000, "arrow_speed": 12, "note_interval_start": 0.6, "note_interval_min": 0.2, "unlocked": False}
 }
 
 # Progress file path
@@ -151,7 +244,7 @@ def show_menu(screen, clock, font, big_font):
         render_text_centered(screen, "Funky Flow Friday ", big_font, BLUE, 50)
 
         # Instructions
-        render_text_centered(screen, "Choose a level with UP/DOWN keys, press ENTER", font, WHITE, 120)
+        render_text_centered(screen, "Choose a level", font, WHITE, 120)
         
         # Draw menu options
         for i, (level_id, text) in enumerate(options):
@@ -190,6 +283,15 @@ def show_menu(screen, clock, font, big_font):
         
         clock.tick(60)
 
+def load_beatmap(filename="beatmap.json"):
+    try:
+        with open(filename, 'r') as f:
+            return json.load(f)
+    except FileNotFoundError:
+        print("Beatmap not found.")
+        return []
+
+
 # === Game Loop ===
 def play_level(screen, clock, font, big_font, level_id):
     level_config = LEVELS[level_id]
@@ -197,6 +299,29 @@ def play_level(screen, clock, font, big_font, level_id):
     win_threshold = level_config["win_threshold"]
     note_interval_start = level_config["note_interval_start"]
     note_interval_min = level_config["note_interval_min"]
+    
+    beat_times = load_beatmap()
+    beat_index = 0
+
+    if level_id == 1:
+        beat_times = load_beatmap("beatmap.json")
+        pygame.mixer.music.load("music/Tetris.mp3")
+        pygame.mixer.music.set_volume(0.3)
+        pygame.mixer.music.play()
+
+    elif level_id == 2:
+        beat_times = load_beatmap("beatmap2.json")
+        pygame.mixer.music.load("music/SoulChef.mp3")
+        pygame.mixer.music.set_volume(0.3)
+        pygame.mixer.music.play()
+
+    elif level_id == 3:
+        beat_times = load_beatmap("beatmap3.json")
+        pygame.mixer.music.load("music/_Tengen Toppa Gurren Lagann 1 Opening.mp3")
+        pygame.mixer.music.set_volume(0.3)
+        pygame.mixer.music.play()
+
+
     
     arrows, glowing_arrows = load_arrow_images()
 
@@ -238,13 +363,15 @@ def play_level(screen, clock, font, big_font, level_id):
             if e.type == pygame.QUIT:
                 pygame.quit()
                 sys.exit()
-            elif e.type == pygame.KEYDOWN:
+            elif e.type == pygame.KEYDOWN: 
                 if e.key == pygame.K_ESCAPE:
-                    return "menu"  # Return to menu
+                    pygame.mixer.music.stop()
+                    return "menu"
                 if (game_over or game_won) and e.key == pygame.K_r:
                     return play_level(screen, clock, font, big_font, level_id)  # Restart level
                 if (game_over or game_won) and e.key == pygame.K_m:
-                    return "menu"  # Go to menu
+                    pygame.mixer.music.stop()
+                    return "menu"
                 if not (game_over or game_won):
                     direction = KEY_BINDINGS.get(e.key)
                     if direction:
@@ -282,21 +409,31 @@ def play_level(screen, clock, font, big_font, level_id):
 
         # Check win/loss conditions
         if score >= win_threshold:
-            # Unlock next level if this one is completed
+            pygame.mixer.music.stop()
             if level_id < max(LEVELS.keys()):
                 LEVELS[level_id + 1]["unlocked"] = True
                 save_progress()
             game_won, paused = True, True
+
         if health <= 0:
+            pygame.mixer.music.stop()
             game_over, paused = True, True
 
-        # Spawn notes at intervals
-        if not paused:
-            if time.time() - last_note_time > note_interval:
+        # # Spawn notes at intervals
+        # if not paused:
+        #     if time.time() - last_note_time > note_interval:
+        #         direction = random.choice(list(targets.keys()))
+        #         notes.append(Note(direction, targets[direction], arrow_speed))
+        #         last_note_time = time.time()
+        #         note_interval = max(note_interval_min, note_interval * 0.99)  # Accelerate note speed
+        
+        # Spawn notes based on beat timestamps
+        current_time_sec = pygame.mixer.music.get_pos() / 1000.0
+        if not paused and beat_index < len(beat_times):
+            if current_time_sec >= beat_times[beat_index]:
                 direction = random.choice(list(targets.keys()))
                 notes.append(Note(direction, targets[direction], arrow_speed))
-                last_note_time = time.time()
-                note_interval = max(note_interval_min, note_interval * 0.99)  # Accelerate note speed
+                beat_index += 1
 
         # Update glow timers
         for ta in target_arrows.values():
@@ -394,6 +531,8 @@ def main():
     clock = pygame.time.Clock()
     font = pygame.font.SysFont("Arial", 30)
     big_font = pygame.font.SysFont("Arial", 60)
+
+    show_intro_screen(screen)
     
     # Load saved progress
     load_progress()
