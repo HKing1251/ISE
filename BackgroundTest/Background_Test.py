@@ -12,7 +12,7 @@ screen = pygame.display.set_mode((screen_width, screen_height))
 pygame.display.set_caption("Game Window")
 
 #music
-pygame.mixer.music.load('BackgroundTest/SoulChef.mp3')
+pygame.mixer.music.load('BackgroundTest/Ode.mp3')
 pygame.mixer.music.set_volume(0.5)
 pygame.mixer.music.play(-1)  # Loop indefinitely
 
