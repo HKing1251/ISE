@@ -6,11 +6,13 @@ import os
 import json
 import pygame.mixer
 import math
+from pathlib import Path
 pygame.init()
 
 clock = pygame.time.Clock()
 
-from pathlib import Path
+# Set working directory to the project root (ISE folder)
+os.chdir(Path(__file__).resolve().parent.parent)
 
 # === Constants ===
 screen = pygame.display.set_mode((0, 0), pygame.FULLSCREEN)
@@ -35,8 +37,8 @@ PROGRESS_BAR_LENGTH = SCREEN_WIDTH - 200
 SAVE_FILE = "game_progress.json"
 
 
-# Set the working directory to the script's location
-os.chdir(os.path.dirname(os.path.abspath(__file__)))
+# # Set the working directory to the script's location
+# os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
 def resizeObject(originObject, scaledFactor):
     return pygame.transform.scale_by(originObject, scaledFactor)
@@ -50,6 +52,8 @@ gladoliaFont = load_font("assets/Gladolia-Regular.otf", 30)
 gladoliaFontLarge = load_font("assets/Gladolia-Regular.otf", 60)
 moldieFont = load_font("assets/Moldie.otf", 30)
 moldieFontLarge = load_font("assets/Moldie.otf", 60)
+pixelGameFont = load_font("assets/PixelGame.otf", 30)
+pixelGameFontLarge = load_font("assets/PixelGame.otf", 60)
 
 # === Particle System ===
 class Particle:
@@ -507,8 +511,8 @@ class FinishLineFlag:
 
 # === Level Configuration ===
 LEVELS = {
-    1: {"name": "Level 1", "win_threshold": 200, "arrow_speed": 5, "note_interval_start": 1.0, "note_interval_min": 0.3, "unlocked": True},
-    2: {"name": "Level 2", "win_threshold": 1500, "arrow_speed": 9, "note_interval_start": 1.0, "note_interval_min": 0.25, "unlocked": False},
+    1: {"name": "Level 1", "win_threshold": 200, "arrow_speed": 5, "note_interval_start": 1.5, "note_interval_min": 0.35, "unlocked": True},
+    2: {"name": "Level 2", "win_threshold": 1500, "arrow_speed": 8, "note_interval_start": 1.5, "note_interval_min": 0.25, "unlocked": False},
     3: {"name": "Level 3", "win_threshold": 3000, "arrow_speed": 10, "note_interval_start": 1.5, "note_interval_min": 0.25, "unlocked": False}
 }
 
@@ -814,22 +818,27 @@ def play_level(screen, clock, font, big_font, level_id):
     # Load beatmap and music based on level
     beat_times = load_beatmap()
     beat_index = 0
+    
 
     if level_id == 1:
-        beat_times = load_beatmap("beatmap.json")
-        pygame.mixer.music.load("music/Tetris.mp3")
+        beat_times = load_beatmap("beatmap5.json")
+        pygame.mixer.music.load("music/eighties.mp3")
+        song_length = pygame.mixer.Sound("music/eighties.mp3").get_length()
         pygame.mixer.music.set_volume(0.3)
         pygame.mixer.music.play()
+
 
     elif level_id == 2:
         beat_times = load_beatmap("beatmap2.json")
         pygame.mixer.music.load("music/SoulChef.mp3")
+        song_length = pygame.mixer.Sound("music/SoulChef.mp3").get_length()
         pygame.mixer.music.set_volume(0.3)
         pygame.mixer.music.play()
 
     elif level_id == 3:
         beat_times = load_beatmap("beatmap.json")
         pygame.mixer.music.load("music/Tetris.mp3")
+        song_length = pygame.mixer.Sound("music/Tetris.mp3").get_length()
         pygame.mixer.music.set_volume(0.3)
         pygame.mixer.music.play()
 
@@ -915,13 +924,15 @@ def play_level(screen, clock, font, big_font, level_id):
                             blood_splash_timer = pygame.time.get_ticks()
 
         # Check win/loss conditions
-        if score >= win_threshold:
+        current_time = pygame.mixer.music.get_pos() / 1000.0
+        if current_time >= song_length - 0.5:
+            game_won, paused = True, True
             pygame.mixer.music.stop()
             if level_id < max(LEVELS.keys()):
                 LEVELS[level_id + 1]["unlocked"] = True
                 save_progress()
-            game_won, paused = True, True
 
+            
         if health <= 0:
             pygame.mixer.music.stop()
             game_over, paused = True, True
@@ -950,17 +961,18 @@ def play_level(screen, clock, font, big_font, level_id):
                     ta["glow"] = False
 
         # Update and remove notes
-        for note in notes[:]:
-            note.update()
-            if note.missed:
-                misses += 1
-                combo = 0
-                current_rating = ratings["miss"]
-                rating_timer = RATING_DISPLAY_TIME
-                health = max(0, health - 5)
-                blood_splash_timer = pygame.time.get_ticks()
-            if note.y < 0 or note.hit:
-                notes.remove(note)
+        if not paused:
+            for note in notes[:]:
+                note.update()
+                if note.missed:
+                    misses += 1
+                    combo = 0
+                    current_rating = ratings["miss"]
+                    rating_timer = RATING_DISPLAY_TIME
+                    health = max(0, health - 5)
+                    blood_splash_timer = pygame.time.get_ticks()
+                if note.y < 0 or note.hit:
+                    notes.remove(note)
 
         if rating_timer > 0:
             rating_timer -= 1
@@ -1003,8 +1015,12 @@ def play_level(screen, clock, font, big_font, level_id):
                         (PROGRESS_BAR_X + PROGRESS_BAR_LENGTH, PROGRESS_BAR_Y), 4)
 
         # Calculate red flag position
-        progress_ratio = min(1.0, score / win_threshold)
+        current_time_sec = pygame.mixer.music.get_pos() / 1000.0
+        progress_ratio = min(1.0, current_time_sec / song_length)
         red_flag_x = PROGRESS_BAR_X + int(PROGRESS_BAR_LENGTH * progress_ratio)
+        f"{int(current_time_sec)} / {int(song_length)} sec"
+        time_text = font.render(f"{int(current_time_sec)} / {int(song_length)} sec", True, WHITE)
+        screen.blit(time_text, (PROGRESS_BAR_X, PROGRESS_BAR_Y - 30))
 
         # Draw flags
         red_flag = RedFlag(red_flag_x, PROGRESS_BAR_Y - 40)
@@ -1034,14 +1050,14 @@ def play_level(screen, clock, font, big_font, level_id):
                     lose_rect = scaled.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2 - 50))
                     screen.blit(scaled, lose_rect)
                 else:
-                    screen.blit(big_font.render("GAME OVER", True, RED), (SCREEN_WIDTH // 2 - 150, SCREEN_HEIGHT // 2 - 50))
+                    screen.blit(pixelGameFontLarge.render("GAME OVER", True, RED), (SCREEN_WIDTH // 2 - 150, SCREEN_HEIGHT // 2 - 50))
 
-                screen.blit(font.render("Press R to restart, M for menu, ESC to quit", True, WHITE), 
+                screen.blit(pixelGameFont.render("Press R to restart, M for menu, ESC to quit", True, WHITE), 
                             (SCREEN_WIDTH // 2 - 210, SCREEN_HEIGHT // 2 + 10))
 
-            elif game_won:
-                screen.blit(big_font.render("LEVEL COMPLETE!", True, GREEN), 
-                            (SCREEN_WIDTH // 2 - 210, SCREEN_HEIGHT // 2 - 100))
+            # elif game_won:
+            #     screen.blit(pixelGameFontLarge.render("LEVEL COMPLETE!", True, GREEN), 
+            #                 (SCREEN_WIDTH // 2 , SCREEN_HEIGHT // 2 - 50))
                 
                 if WIN_IMAGE:
                     size = heartbeat_scale(WIN_IMAGE.get_size(), pulse_rate=3.5, time_ms=tickSpeed)
@@ -1053,12 +1069,12 @@ def play_level(screen, clock, font, big_font, level_id):
                     next_level_text = font.render(f"Level {level_id + 1} Unlocked!", True, YELLOW)
                     screen.blit(next_level_text, (SCREEN_WIDTH // 2 - next_level_text.get_width() // 2, SCREEN_HEIGHT // 2 + 20))
                 
-                screen.blit(font.render("Press R to replay, M for menu, ESC to quit", True, WHITE), 
+                screen.blit(pixelGameFont.render("Press R to replay, M for menu, ESC to quit", True, WHITE), 
                             (SCREEN_WIDTH // 2 - 210, SCREEN_HEIGHT // 2 + 80))
 
         # Instruction line
         else:
-            instructions = font.render("Press arrow keys when notes align with targets", True, WHITE)
+            instructions = pixelGameFont.render("Press arrow keys when notes align with targets", True, WHITE)
             screen.blit(instructions, instructions.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT - 30)))
 
         pygame.display.flip()
@@ -1099,5 +1115,8 @@ def main():
             game_state = play_level(screen, clock, font, big_font, game_state)
 
 # Run the game
+def run_game():
+    main()
+
 if __name__ == "__main__":
     main()
