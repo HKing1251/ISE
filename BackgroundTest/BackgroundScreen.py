@@ -167,13 +167,15 @@ def init_background(screen):
     darkened_bg = pygame.transform.scale(bg_image, (SCREEN_WIDTH, SCREEN_HEIGHT))
 
     # Speakers
-    speaker_left1 = scale_image(pygame.image.load(os.path.join(BASE_PATH, "SpeakLeft1.png")).convert_alpha(), 0.4 * scale)
-    speaker_left2 = scale_image(pygame.image.load(os.path.join(BASE_PATH, "SpeakLeft2.png")).convert_alpha(), 0.4 * scale)
-    speaker_right1 = scale_image(pygame.image.load(os.path.join(BASE_PATH, "SpeakRight1.png")).convert_alpha(), 0.4 * scale)
-    speaker_right2 = scale_image(pygame.image.load(os.path.join(BASE_PATH, "SpeakRight2.png")).convert_alpha(), 0.4 * scale)
+    speaker_left1 = scale_image(pygame.image.load(os.path.join(BASE_PATH, "SpeakLeft1.png")).convert_alpha(), 0.2 * scale)
+    speaker_left2 = scale_image(pygame.image.load(os.path.join(BASE_PATH, "SpeakLeft2.png")).convert_alpha(), 0.2 * scale)
+    speaker_right1 = scale_image(pygame.image.load(os.path.join(BASE_PATH, "SpeakRight1.png")).convert_alpha(), 0.2 * scale)
+    speaker_right2 = scale_image(pygame.image.load(os.path.join(BASE_PATH, "SpeakRight2.png")).convert_alpha(), 0.2 * scale)
 
-    left_speaker_pos = (int(100 * scale), SCREEN_HEIGHT - speaker_left1.get_height())
-    right_speaker_pos = (SCREEN_WIDTH - int(100 * scale) - speaker_right1.get_width(), SCREEN_HEIGHT - speaker_right1.get_height())
+    left_x  = int(SCREEN_WIDTH * 0.30 - speaker_left1.get_width()  / 2)
+    right_x = int(SCREEN_WIDTH * 0.70 - speaker_right1.get_width() / 2)
+    left_speaker_pos  = (left_x,  SCREEN_HEIGHT - speaker_left1.get_height()*2)
+    right_speaker_pos = (right_x, SCREEN_HEIGHT - speaker_right1.get_height()*2)
 
     # Spotlights
     spotlights = [
