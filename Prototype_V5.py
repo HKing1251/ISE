@@ -1156,7 +1156,7 @@ def play_level(screen, clock, font, big_font, level_id):
                                 distance = abs(note.y - TARGET_Y)
                                 if distance < 15:
                                     score += 100
-                                    combo += 2
+                                    combo += 1
                                     current_rating = ratings["perfect"]
                                     health = min(MAX_HEALTH, health + 10)
                                 elif distance < 35:
