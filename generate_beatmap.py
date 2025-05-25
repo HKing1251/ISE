@@ -12,5 +12,7 @@ def extract_beats(mp3_path, output_json):
     print(f"Saved {len(beat_times)} beats to {output_json}")
 
 extract_beats("music/Tetris.mp3", "beatmap.json")
-extract_beats("music/SoulChef.mp3", "beatmap2.json")
-extract_beats("music/_Tengen Toppa Gurren Lagann 1 Opening.mp3", "beatmap3.json")
+extract_beats("music/eighties.mp3", "beatmap1.json")
+extract_beats("music/8-bit-music.mp3", "beatmap2.json")
+extract_beats("music/Checker.mp3", "beatmap3.json")
+extract_beats("music/Heartache.mp3", "beatmap4.json")
