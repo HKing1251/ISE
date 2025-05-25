@@ -12,13 +12,10 @@ from BackgroundTest.BackgroundScreen import draw_dynamic_background as draw_bg_1
 from BackgroundTest.BackgroundScreen2 import draw_dynamic_background as draw_bg_2
 from BackgroundTest.BackgroundScreen3 import draw_dynamic_background as draw_bg_3
 
-
 pygame.init()
 
 clock = pygame.time.Clock()
 
-# # Set working directory to the project root (ISE folder)
-# os.chdir(Path(__file__).resolve().parent.parent)
 
 # === Constants ===
 screen = pygame.display.set_mode((0, 0), pygame.FULLSCREEN)
@@ -48,6 +45,9 @@ max_score = 1000
 # Set the working directory to the script's location
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
+BASE_PATH = os.path.dirname(__file__)
+SPRITE_FOLDER = os.path.join(BASE_PATH, "ChoosingCharacter", "Player")  # New correct path
+
 def resizeObject(originObject, scaledFactor):
     return pygame.transform.scale_by(originObject, scaledFactor)
 
@@ -63,6 +63,85 @@ moldieFontLarge = load_font("assets/Moldie.otf", 60)
 pixelGameFont = load_font("assets/PixelGame.otf", 30)
 pixelGameFontLarge = load_font("assets/PixelGame.otf", 60)
 pixelGameFontHuge = load_font("assets/PixelGame.otf", 85)
+
+
+class Character:
+    def __init__(self, x, y, screen_width, screen_height,speed):
+        self.x = x
+        self.y = y
+        self.screen_width = screen_width
+        self.screen_height = screen_height
+        self.direction = "idle"
+        self.current_frame = 0
+        self.frame_timer = 0
+        self.frame_delay = speed  # Animation speed (higher = slower)
+        self.speed = 5
+        self.scale = 1
+        self.last_direction = None  # Track previous direction
+
+        # Load animations
+        self.animations = {
+            "idle": self.load_frames("BoyfriendIdle", 4),
+            "down": self.load_frames("BoyfriendDown", 2),
+            "up": self.load_frames("BoyfriendUp", 2),
+            "left": self.load_frames("BoyfriendLeft", 2),
+            "right": self.load_frames("BoyfriendRight", 2),
+        }
+        
+        # Set initial image
+        self.image = self.animations["idle"][0]
+
+    def load_frames(self, base_name, frame_count):
+        """Load animation frames with error handling"""
+        frames = []
+        for i in range(1, frame_count + 1):
+            try:
+                path = os.path.join(SPRITE_FOLDER, f"{base_name}({i}).png")
+                img = pygame.image.load(path).convert_alpha()
+                frames.append(pygame.transform.scale_by(img, self.scale))
+            except:
+                try:
+                    path = os.path.join(SPRITE_FOLDER, f"{base_name}({i}).PNG")
+                    img = pygame.image.load(path).convert_alpha()
+                    frames.append(pygame.transform.scale_by(img, self.scale))
+                except:
+                    # Create placeholder if image fails to load
+                    placeholder = pygame.Surface((50, 50), pygame.SRCALPHA)
+                    pygame.draw.rect(placeholder, (255, 0, 0), (0, 0, 50, 50))
+                    frames.append(placeholder)
+        return frames
+
+    def update(self, keys):
+        # Store previous direction
+        prev_direction = self.direction
+        self.direction = "idle"
+        
+        # Direction change based on key input (but no movement)
+        if keys[pygame.K_LEFT] or keys[pygame.K_a]:
+            self.direction = "left"
+        elif keys[pygame.K_RIGHT] or keys[pygame.K_d]:
+            self.direction = "right"
+        elif keys[pygame.K_UP] or keys[pygame.K_w]:
+            self.direction = "up"
+        elif keys[pygame.K_DOWN] or keys[pygame.K_s]:
+            self.direction = "down"
+
+        # Reset animation if direction changed
+        if prev_direction != self.direction:
+            self.current_frame = 0
+            self.frame_timer = 0
+
+        # Animation update - only advance frames after delay
+        self.frame_timer += 1
+        if self.frame_timer >= self.frame_delay:
+            self.frame_timer = 0
+            if self.animations[self.direction]:  # Check if frames exist
+                self.current_frame = (self.current_frame + 1) % len(self.animations[self.direction])
+                self.image = self.animations[self.direction][self.current_frame]
+
+
+    def draw(self, surface):
+        surface.blit(self.image, (self.x, self.y))
 
 # === Particle System ===
 class Particle:
@@ -758,6 +837,82 @@ def load_beatmap(filename="beatmap.json"):
         print("Beatmap not found.")
         return []
     
+def play_intro(screen, clock, font, big_font):
+    axel = Character(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2 + 50, SCREEN_WIDTH, SCREEN_HEIGHT, 8)
+
+    text_lines = [
+        "A long time ago...",
+        "Ray Gun — a pro dancer — embarrassed the dance community.",
+        "He crushed the spirit of freestylers everywhere.",
+        "But now...",
+        "One dancer will rise...",
+        "To restore the rhythm.",
+        "To bring the flow back.",
+        "To become a legend.",
+        "His name is...",
+        "AXEL!",
+        "FUNKY FLOW FRIDAY — LET'S DANCE."
+    ]
+
+    current_line = 0
+    line_timer = pygame.time.get_ticks()
+    line_delay = 2500  # 2.5 seconds per line
+    fade_duration = 500  # ms
+    fade_in = True
+    alpha = 0
+
+    running = True
+    while running:
+        screen.fill((0, 0, 0))  # Black background
+
+        current_time = pygame.time.get_ticks()
+        keys = pygame.key.get_pressed()
+
+        # Skip on Enter or Space
+        if keys[pygame.K_RETURN] or keys[pygame.K_SPACE]:
+            return
+
+        # Manage line change
+        if current_time - line_timer > line_delay:
+            line_timer = current_time
+            current_line += 1
+            fade_in = True
+            alpha = 0
+            if current_line >= len(text_lines):
+                running = False
+
+        # Character animation
+        axel.update(keys)
+        axel.draw(screen)
+
+        # Show line with fade-in
+        if current_line < len(text_lines):
+            text = text_lines[current_line]
+            rendered_text = font.render(text, True, (255, 255, 255))
+            fade_surface = pygame.Surface(rendered_text.get_size(), pygame.SRCALPHA)
+
+            if fade_in and alpha < 255:
+                alpha += 255 // (fade_duration // (1000 // 60))  # Estimate based on 60 FPS
+                alpha = min(255, alpha)
+            else:
+                alpha = 255
+
+            fade_surface.blit(rendered_text, (0, 0))
+            fade_surface.set_alpha(alpha)
+            text_rect = fade_surface.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT - 100))
+            screen.blit(fade_surface, text_rect)
+
+        # # Add top-right "Press ENTER to skip"
+        # skip_text = font.render("Press ENTER to skip", True, (200, 200, 200))
+        # screen.blit(skip_text, (SCREEN_WIDTH - skip_text.get_width() - 20, 20))
+
+        # Add centered game title during final line
+        if current_line == len(text_lines) - 1:
+            title_surface = big_font.render("FUNKY FLOW FRIDAY", True, (255, 215, 0))
+            screen.blit(title_surface, title_surface.get_rect(center=(SCREEN_WIDTH // 2, 80)))
+
+        pygame.display.flip()
+        clock.tick(60)
 
 
 
@@ -952,11 +1107,21 @@ def play_level(screen, clock, font, big_font, level_id):
 
     level_title = pixelGameFont.render(f"{level_config['name']}", True, BLUE)
     particles = ParticleSystem()
+    character = Character(
+        SCREEN_WIDTH // 2 - 50,  # Approx half-width of character
+        SCREEN_HEIGHT // 2 + 100,  # Slightly below center (adjust as needed)
+        SCREEN_WIDTH,
+        SCREEN_HEIGHT,
+        4
+    )
 
     # === Game Loop ===
     running = True
     while running:
         current_time = pygame.time.get_ticks()
+
+
+
         
         for e in pygame.event.get():
             if e.type == pygame.QUIT:
@@ -1075,7 +1240,9 @@ def play_level(screen, clock, font, big_font, level_id):
             screen.fill(RED)  # Fallback background
             print("Drawing red background...")
 
-
+        keys = pygame.key.get_pressed()
+        character.update(keys)
+        character.draw(screen)
 
         # Level title at the top
         screen.blit(level_title, (SCREEN_WIDTH // 2 - level_title.get_width() // 2, 10))
@@ -1206,8 +1373,12 @@ def main():
     pygame.display.set_caption("FUNKY FLOW FRIDAY")
     clock = pygame.time.Clock()
 
+    play_intro(screen, clock, pixelGameFontLarge, pixelGameFontHuge)
+
+
     font = moldieFont
     big_font = atlantaFontLarge
+
  
     global LOSE_IMAGE, WIN_IMAGE
     LOSE_IMAGE = load_lose_image()
