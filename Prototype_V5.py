@@ -1021,6 +1021,7 @@ def play_level(screen, clock, font, big_font, level_id):
 
 
     # Initialize game state variables FIRST
+    global combo
     notes, score, combo, misses, health = [], 0, 0, 0, INITIAL_HEALTH
     game_over = game_won = paused = False
     current_rating = None
@@ -1147,17 +1148,17 @@ def play_level(screen, clock, font, big_font, level_id):
                                 distance = abs(note.y - TARGET_Y)
                                 if distance < 15:
                                     score += 100
-                                    combo += 1
+                                    combo += 5
                                     current_rating = ratings["perfect"]
                                     health = min(MAX_HEALTH, health + 10)
                                 elif distance < 35:
                                     score += 50
-                                    combo += 1
+                                    combo += 5
                                     current_rating = ratings["good"]
                                     health = min(MAX_HEALTH, health + 5)
                                 elif distance < 55:
                                     score += 10
-                                    combo = 0
+                                    combo = 2
                                     current_rating = ratings["bad"]
                                     health = min(MAX_HEALTH, health + 2)
                                 else:

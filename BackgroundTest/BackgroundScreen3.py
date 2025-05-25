@@ -1,133 +1,191 @@
-# BackgroundLvl3.py - Disco-style dynamic background for final level
-
 import pygame
 import math
 import random
 import os
+import colorsys
 
 BASE_PATH = os.path.dirname(__file__)
 
+# Globals
 initialized = False
 screen_width = screen_height = 0
 background_image = None
-speaker1 = speaker2 = None
+left_speaker = right_speaker = None
 speaker_width, speaker_height = 180, 180
 left_speaker_pos = right_speaker_pos = (0, 0)
-use_first_image = True
-last_image_swap_time = 0
+
+#pulse
 beat_pulse_time = 0
 beat_pulse_amount = 0
 beat_pulse_duration = 150
 ambient_pulse = 0
 ambient_pulse_direction = 0.02
-disco_lights = []
-MAX_DISCO_LIGHTS = 12
 
-class DiscoLight:
-    def __init__(self):
-        self.source_x = screen_width // 2
-        self.source_y = 140
-        self.angle = random.uniform(0, 2 * math.pi)
-        self.length = random.randint(300, 600)
-        self.width = random.randint(20, 40)
-        self.rotation_speed = random.uniform(0.005, 0.02)
-        self.hue = random.random()
-        self.color = self.hsv_to_rgb(self.hue, 0.9, 1.0)
-        self.alpha = random.randint(50, 120)
-        self.alpha_change = random.uniform(-0.5, 0.5)
-        self.life = random.randint(150, 300)
+# Combo 
+try:
+    import __main__
+    MAIN_MODULE_AVAILABLE = True
+except ImportError:
+    MAIN_MODULE_AVAILABLE = False
 
-    def hsv_to_rgb(self, h, s, v):
-        if s == 0.0:
-            return (v, v, v)
-        i = int(h * 6.0)
-        f = (h * 6.0) - i
-        p = v * (1.0 - s)
-        q = v * (1.0 - s * f)
-        t = v * (1.0 - s * (1.0 - f))
-        i %= 6
-        if i == 0: return (int(v * 255), int(t * 255), int(p * 255))
-        if i == 1: return (int(q * 255), int(v * 255), int(p * 255))
-        if i == 2: return (int(p * 255), int(v * 255), int(t * 255))
-        if i == 3: return (int(p * 255), int(q * 255), int(v * 255))
-        if i == 4: return (int(t * 255), int(p * 255), int(v * 255))
-        if i == 5: return (int(v * 255), int(p * 255), int(q * 255))
+def get_current_combo() -> int:
+    if MAIN_MODULE_AVAILABLE:
+        try:
+            if hasattr(__main__, 'combo'):
+                return __main__.combo
+            if hasattr(__main__, 'current_combo'):
+                return __main__.current_combo
+        except:
+            pass
+    return 0
 
-    def update(self):
-        self.angle += self.rotation_speed
-        self.alpha += self.alpha_change
-        if self.alpha <= 30:
-            self.alpha = 30
-            self.alpha_change = random.uniform(0.2, 0.8)
-        elif self.alpha >= 120:
-            self.alpha = 120
-            self.alpha_change = random.uniform(-0.8, -0.2)
-        self.hue = (self.hue + 0.001) % 1.0
-        self.color = self.hsv_to_rgb(self.hue, 0.9, 1.0)
-        self.life -= 1
-        return self.life > 0
+# Screen shake on combo milestones
+last_milestone = 0
+shake_start_time = 0
+shake_duration = 1000  
+shake_amplitude = 5   
 
-    def draw(self, surface):
-        end_x = self.source_x + math.cos(self.angle) * self.length
-        end_y = self.source_y + math.sin(self.angle) * self.length
-        beam_surface = pygame.Surface((screen_width, screen_height), pygame.SRCALPHA)
-        angle_perpendicular = self.angle + math.pi/2
-        source_width = self.width * 0.2
-        p1_near = (self.source_x + math.cos(angle_perpendicular) * source_width,
-                   self.source_y + math.sin(angle_perpendicular) * source_width)
-        p2_near = (self.source_x - math.cos(angle_perpendicular) * source_width,
-                   self.source_y - math.sin(angle_perpendicular) * source_width)
-        p1_far = (end_x + math.cos(angle_perpendicular) * self.width,
-                  end_y + math.sin(angle_perpendicular) * self.width)
-        p2_far = (end_x - math.cos(angle_perpendicular) * self.width,
-                  end_y - math.sin(angle_perpendicular) * self.width)
-        points = [p1_near, p2_near, p2_far, p1_far]
-        color_with_alpha = (*self.color, int(self.alpha))
-        pygame.draw.polygon(beam_surface, color_with_alpha, points)
-        for i in range(3):
-            glow_width = source_width * (1 + i * 0.5)
-            end_width = self.width * (1 + i * 0.5)
-            p1_near_glow = (self.source_x + math.cos(angle_perpendicular) * glow_width,
-                           self.source_y + math.sin(angle_perpendicular) * glow_width)
-            p2_near_glow = (self.source_x - math.cos(angle_perpendicular) * glow_width,
-                           self.source_y - math.sin(angle_perpendicular) * glow_width)
-            p1_far_glow = (end_x + math.cos(angle_perpendicular) * end_width,
-                          end_y + math.sin(angle_perpendicular) * end_width)
-            p2_far_glow = (end_x - math.cos(angle_perpendicular) * end_width,
-                          end_y - math.sin(angle_perpendicular) * end_width)
-            glow_points = [p1_near_glow, p2_near_glow, p2_far_glow, p1_far_glow]
-            glow_alpha = max(10, int(self.alpha * 0.3 * (3-i)/3))
-            glow_color = (*self.color, glow_alpha)
-            pygame.draw.polygon(beam_surface, glow_color, glow_points)
-        surface.blit(beam_surface, (0, 0))
+# Smoke effect
+SMOKE_IMG = None
+smoke_left = smoke_right = None
+MAX_PARTICLES = 10
+BURST_COUNT = 5
+
+# Spotlights
+spotlights = []
+
+def scale(img: pygame.Surface, factor: float) -> pygame.Surface:
+    w = int(img.get_width() * factor)
+    h = int(img.get_height() * factor)
+    return pygame.transform.scale(img, (w, h))
 
 class AudioAnalyzer:
     def __init__(self):
         self.oscillators = [
-            {"freq": 2.5, "amp": 0.3, "phase": 0},
-            {"freq": 4.2, "amp": 0.15, "phase": 1.3},
-            {"freq": 1.8, "amp": 0.25, "phase": 2.7},
-            {"freq": 6.0, "amp": 0.1, "phase": 0.5}
+            {"freq":2.5, "amp":0.3,  "phase":0},
+            {"freq":4.2, "amp":0.15, "phase":1.3},
+            {"freq":1.8, "amp":0.25, "phase":2.7},
+            {"freq":6.0, "amp":0.1,  "phase":0.5}
         ]
         self.current_volume = 0
         self.frame_count = 0
 
-    def analyze(self):
+    def analyze(self) -> float:
         self.frame_count += 1
         if self.frame_count % 3 == 0:
-            time_factor = pygame.time.get_ticks() * 0.001
-            oscillation = sum(osc["amp"] * math.sin(time_factor * osc["freq"] + osc["phase"]) for osc in self.oscillators)
-            base_vol = 0.35
-            random_vol = random.uniform(-0.07, 0.07)
-            self.current_volume = max(0.1, min(1.0, base_vol + oscillation + random_vol))
+            t = pygame.time.get_ticks() * 0.001
+            osc = sum(o["amp"] * math.sin(t * o["freq"] + o["phase"])
+                      for o in self.oscillators)
+            base = 0.35
+            rnd = random.uniform(-0.07, 0.07)
+            self.current_volume = max(0.1, min(1.0, base + osc + rnd))
             return self.current_volume
-        return 0
+        return 0.0
 
 audio_analyzer = AudioAnalyzer()
 
-def init_background(screen):
-    global initialized, background_image, speaker1, speaker2, left_speaker_pos, right_speaker_pos
-    global screen_width, screen_height
+class SmokeParticle:
+    def __init__(self, x: float, y: float):
+        self.x, self.y = x, y
+        self.scale_k = 0.1
+        self.img = scale(SMOKE_IMG, self.scale_k)
+        self.alpha = 255
+        self.alpha_rate = 3
+        self.alive = True
+        self.vx = random.uniform(-0.1, 0.1)
+        self.vy = random.uniform(4.7, 5.0)
+
+    def update(self):
+        self.x += self.vx
+        self.y -= self.vy
+        self.scale_k += 0.02
+        self.alpha -= self.alpha_rate
+        if self.alpha <= 0:
+            self.alpha = 0
+            self.alive = False
+        self.alpha_rate = max(1.0, self.alpha_rate - 0.03)
+        self.img = scale(SMOKE_IMG, self.scale_k)
+        self.img.set_alpha(int(self.alpha))
+
+    def draw(self, surface: pygame.Surface):
+        rect = self.img.get_rect(center=(int(self.x), int(self.y)))
+        surface.blit(self.img, rect)
+
+class SmokeEmitter:
+    def __init__(self, x: float, y: float):
+        self.x, self.y = x, y
+        self.particles: list[SmokeParticle] = []
+
+    def burst(self):
+        for _ in range(BURST_COUNT):
+            if len(self.particles) >= MAX_PARTICLES:
+                break
+            self.particles.append(SmokeParticle(self.x, self.y))
+
+    def update(self):
+        alive = []
+        for p in self.particles:
+            p.update()
+            if p.alive:
+                alive.append(p)
+        self.particles = alive
+
+    def draw(self, surface: pygame.Surface):
+        for p in sorted(self.particles, key=lambda p: p.y, reverse=True):
+            p.draw(surface)
+
+class Spotlight:
+    def __init__(self, x: float, cone_angle=20):
+        self.x = x
+        self.y = 0
+        self.cone_angle = cone_angle
+        # timings
+        self.pattern_time  = random.uniform(0, 2*math.pi)
+        self.pattern_speed = random.uniform(0.02, 0.05)
+        self.swing_amount = screen_width * 0.2
+        self.zig_amp = screen_height * 0.
+        self.hue   = random.random()
+        self.alpha = 60
+
+    def update(self):
+        # advance time & hue
+        self.pattern_time += self.pattern_speed
+        self.hue= (self.hue + 0.002) % 1.0
+        # target
+        tx = self.x + math.sin(self.pattern_time * 3) * self.swing_amount
+        ty = screen_height - math.sin(self.pattern_time) * self.zig_amp
+        self.target_x, self.target_y = tx, ty
+
+    def draw(self, surface: pygame.Surface):
+        cone = pygame.Surface((screen_width, screen_height), pygame.SRCALPHA)
+        dx, dy = self.target_x - self.x, self.target_y - self.y
+        dist = math.hypot(dx, dy)
+        ang  = math.atan2(dy, dx)
+        width = 2 * dist * math.tan(math.radians(self.cone_angle / 2))
+        p0 = (self.x, self.y)
+        p1 = (self.target_x - width/2*math.cos(ang+math.pi/2),self.target_y - width/2*math.sin(ang+math.pi/2))
+        p2 = (self.target_x + width/2*math.cos(ang+math.pi/2),self.target_y + width/2*math.sin(ang+math.pi/2))
+        #rainbow stuff
+        for i in range(5):
+            alpha = int(self.alpha * 1.5 * (5 - i) / 5)
+            alpha = min(alpha, 255)
+            hue_i = (self.hue + i*0.02) % 1.0
+            r, g, b = colorsys.hsv_to_rgb(hue_i, 1, 1)
+            color = (int(r*255), int(g*255), int(b*255), alpha)
+    
+            sf = 1 + i*0.05
+            v1 = (p0[0] + (p1[0]-p0[0])*sf, p0[1] + (p1[1]-p0[1])*sf)
+            v2 = (p0[0] + (p2[0]-p0[0])*sf, p0[1] + (p2[1]-p0[1])*sf)
+            
+            pygame.draw.polygon(cone, color, [p0, v1, v2])
+        
+        surface.blit(cone, (0,0))
+
+def init_background(screen: pygame.Surface):
+    global initialized, screen_width, screen_height
+    global background_image, left_speaker, right_speaker
+    global left_speaker_pos, right_speaker_pos
+    global SMOKE_IMG, smoke_left, smoke_right, spotlights
 
     if initialized:
         return
@@ -135,66 +193,94 @@ def init_background(screen):
     screen_width, screen_height = screen.get_size()
     initialized = True
 
-    bg_path = os.path.join(BASE_PATH, "bg3.png")
-    speaker1_path = os.path.join(BASE_PATH, "Lvl3Speaker1.png")
-    speaker2_path = os.path.join(BASE_PATH, "Lvl3Speaker2.png")
+    # bg + speak+ smoke
+    bg = pygame.image.load(os.path.join(BASE_PATH, "Bg3.png")).convert()
+    background_image = pygame.transform.scale(bg, (screen_width, screen_height))
+    ls = pygame.image.load(os.path.join(BASE_PATH, "Lvl3SpeakerLeft.png")).convert_alpha()
+    rs = pygame.image.load(os.path.join(BASE_PATH, "Lvl3SpeakerRight.png")).convert_alpha()
+    left_speaker = pygame.transform.scale(ls, (speaker_width, speaker_height))
+    right_speaker = pygame.transform.scale(rs, (speaker_width, speaker_height))
+    left_speaker_pos = (20, 20)
+    right_speaker_pos = (screen_width - speaker_width - 20, 20)
+    SMOKE_IMG = pygame.image.load(os.path.join(BASE_PATH, "smoke.png")).convert_alpha()
+    smoke_left = SmokeEmitter(200, screen_height - 60)
+    smoke_right = SmokeEmitter(screen_width - 200, screen_height - 60)
 
-    background_image = pygame.image.load(bg_path).convert()
-    background_image = pygame.transform.scale(background_image, (screen_width, screen_height))
+    #spotlights
+    spotlights = [
+        Spotlight(screen_width * 0.2),
+        Spotlight(screen_width * 0.4),
+        Spotlight(screen_width * 0.6),
+        Spotlight(screen_width * 0.8),
+    ]
 
-    speaker1 = pygame.image.load(speaker1_path).convert_alpha()
-    speaker2 = pygame.image.load(speaker2_path).convert_alpha()
-    speaker1 = pygame.transform.scale(speaker1, (speaker_width, speaker_height))
-    speaker2 = pygame.transform.scale(speaker2, (speaker_width, speaker_height))
-
-    left_speaker_pos = (int(screen_width * 0.15), int(screen_height * 0.55))
-    right_speaker_pos = (int(screen_width * 0.75), int(screen_height * 0.55))
-
-def draw_dynamic_background(screen):
-    global use_first_image, beat_pulse_time, last_image_swap_time, beat_pulse_amount
+def draw_dynamic_background(screen: pygame.Surface):
+    global beat_pulse_time, beat_pulse_amount
     global ambient_pulse, ambient_pulse_direction
+    global last_milestone, shake_start_time
 
     if not initialized:
         init_background(screen)
 
-    current_time = pygame.time.get_ticks()
-    pulse_volume = audio_analyzer.analyze()
+    t_now = pygame.time.get_ticks()
+    combo = get_current_combo()
 
-    if pulse_volume > 0.5:
-        beat_pulse_time = current_time
-        beat_pulse_amount = pulse_volume
-        use_first_image = not use_first_image
-        last_image_swap_time = current_time
 
-    if current_time - beat_pulse_time < beat_pulse_duration:
-        pulse_progress = 1 - ((current_time - beat_pulse_time) / beat_pulse_duration)
-        current_pulse = beat_pulse_amount * pulse_progress
+    if combo > 0 and combo % 5 == 0 and combo != last_milestone:
+        shake_start_time = t_now
+        last_milestone = combo
+        
+    if combo > 0 and combo % 10 == 0 and combo != last_milestone:
+        smoke_left.burst()
+        smoke_right.burst()
+
+    #shake calcs
+    dx = dy = 0
+    if t_now - shake_start_time < shake_duration:
+        dx = random.randint(-shake_amplitude, shake_amplitude)
+        dy = random.randint(-shake_amplitude, shake_amplitude)
+
+    # start buffer
+    buf = pygame.Surface((screen_width, screen_height))
+    buf.blit(background_image, (0, 0))
+
+    #moke
+    smoke_left.update()
+    smoke_left.draw(buf)
+    smoke_right.update()
+    smoke_right.draw(buf)
+
+    #spotlights
+    if combo >= 10:
+        for sp in spotlights:
+            sp.update()
+            sp.draw(buf)
+
+    
+    vol = audio_analyzer.analyze()
+    if vol > 0.5:
+        beat_pulse_time = t_now
+        beat_pulse_amount = vol
+    if t_now - beat_pulse_time < beat_pulse_duration:
+        prog = 1 - ((t_now - beat_pulse_time) / beat_pulse_duration)
+        current_pulse = beat_pulse_amount * prog
     else:
         ambient_pulse += ambient_pulse_direction
         if ambient_pulse > 0.15:
-            ambient_pulse = 0.15
-            ambient_pulse_direction = -0.02
+            ambient_pulse, ambient_pulse_direction = 0.15, -0.02
         elif ambient_pulse < 0:
-            ambient_pulse = 0
-            ambient_pulse_direction = 0.02
+            ambient_pulse, ambient_pulse_direction = 0, 0.02
         current_pulse = ambient_pulse
 
-    screen.blit(background_image, (0, 0))
+    # Speak pulse
+    speaker_scale = 1.0 + current_pulse * 0.3
+    for img, pos in [(left_speaker, left_speaker_pos), (right_speaker, right_speaker_pos)]:
+        w = int(speaker_width * speaker_scale * 1.5)
+        h = int(speaker_height * speaker_scale * 1.5)
+        scaled = pygame.transform.scale(img, (w, h))
+        adj_x = pos[0] - (w - speaker_width) // 2
+        adj_y = pos[1] - (h - speaker_height) // 2
+        buf.blit(scaled, (adj_x, adj_y))
 
-    speaker_scale = 1.0 + current_pulse * 0.25
-    current_speaker = speaker1 if use_first_image else speaker2
-    scaled = pygame.transform.scale(current_speaker, (int(speaker_width * speaker_scale * 1.5), int(speaker_height * speaker_scale * 1.5)))
-
-    for pos in [left_speaker_pos, right_speaker_pos]:
-        adj_x = pos[0] - (scaled.get_width() - speaker_width) // 2
-        adj_y = pos[1] - (scaled.get_height() - speaker_height) // 2
-        screen.blit(scaled, (adj_x, adj_y))
-
-    for light in disco_lights[:]:
-        if not light.update():
-            disco_lights.remove(light)
-        else:
-            light.draw(screen)
-
-    if current_time - last_image_swap_time > 300 and len(disco_lights) < MAX_DISCO_LIGHTS:
-        disco_lights.append(DiscoLight())
+    # blit for shake
+    screen.blit(buf, (dx, dy))
