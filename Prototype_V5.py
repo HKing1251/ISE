@@ -68,7 +68,8 @@ pixelGameFontHuge = load_font("assets/PixelGame.otf", 85)
 option_effect = pygame.mixer.Sound("music\option_effect.wav")
 miss_note = pygame.mixer.Sound("music\hit_effect.wav")
 defeat_effect = pygame.mixer.Sound("music\defeat.wav")
-intro_sound = pygame.mixer.Sound("music\intro.wav") 
+intro_sound = pygame.mixer.Sound("music\intro.wav")
+
 
 class Character:
     def __init__(self, x, y, screen_width, screen_height,speed):
@@ -844,6 +845,7 @@ def load_beatmap(filename="beatmap.json"):
     
 def play_intro(screen, clock, font, big_font):
     axel = Character(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2 + 50, SCREEN_WIDTH, SCREEN_HEIGHT, 8)
+    intro_sound.set_volume(40)
     intro_sound.play()
 
     text_lines = [
@@ -916,6 +918,7 @@ def play_intro(screen, clock, font, big_font):
         if current_line == len(text_lines) - 1:
             title_surface = big_font.render("FUNKY FLOW FRIDAY", True, (255, 215, 0))
             screen.blit(title_surface, title_surface.get_rect(center=(SCREEN_WIDTH // 2, 80)))
+            intro_sound.stop()
 
         pygame.display.flip()
         clock.tick(60)
@@ -1181,6 +1184,7 @@ def play_level(screen, clock, font, big_font, level_id):
                             rating_timer = RATING_DISPLAY_TIME
                             health = max(0, health - 5)
                             blood_splash_timer = pygame.time.get_ticks()
+                            miss_note.play()
 
         # Check win/loss conditions
         current_time = pygame.mixer.music.get_pos() / 1000.0
