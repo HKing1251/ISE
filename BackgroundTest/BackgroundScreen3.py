@@ -40,16 +40,17 @@ def get_current_combo() -> int:
     return 0
 
 # Screen shake on combo milestones
-last_milestone = 0
 shake_start_time = 0
 shake_duration = 1000  
 shake_amplitude = 5   
+last_shake_combo=0
 
 # Smoke effect
 SMOKE_IMG = None
 smoke_left = smoke_right = None
-MAX_PARTICLES = 10
-BURST_COUNT = 5
+MAX_PARTICLES = 4
+BURST_COUNT = 2
+last_smoke_combo=0
 
 # Spotlights
 spotlights = []
@@ -143,7 +144,7 @@ class Spotlight:
         self.pattern_time  = random.uniform(0, 2*math.pi)
         self.pattern_speed = random.uniform(0.02, 0.05)
         self.swing_amount = screen_width * 0.2
-        self.zig_amp = screen_height * 0.
+        self.zig_amp = screen_height * 0.2
         self.hue   = random.random()
         self.alpha = 60
 
@@ -217,7 +218,7 @@ def init_background(screen: pygame.Surface):
 def draw_dynamic_background(screen: pygame.Surface):
     global beat_pulse_time, beat_pulse_amount
     global ambient_pulse, ambient_pulse_direction
-    global last_milestone, shake_start_time
+    global last_shake_combo,last_smoke_combo, shake_start_time 
 
     if not initialized:
         init_background(screen)
@@ -226,13 +227,14 @@ def draw_dynamic_background(screen: pygame.Surface):
     combo = get_current_combo()
 
 
-    if combo > 0 and combo % 5 == 0 and combo != last_milestone:
+    if combo > 0 and combo % 5 == 0 and combo != last_shake_combo:
         shake_start_time = t_now
         last_milestone = combo
         
-    if combo > 0 and combo % 10 == 0 and combo != last_milestone:
+    if combo > 0 and combo % 10 == 0 and combo != last_smoke_combo:
         smoke_left.burst()
         smoke_right.burst()
+        last_smoke_combo = combo
 
     #shake calcs
     dx = dy = 0
