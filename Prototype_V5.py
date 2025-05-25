@@ -64,6 +64,11 @@ pixelGameFont = load_font("assets/PixelGame.otf", 30)
 pixelGameFontLarge = load_font("assets/PixelGame.otf", 60)
 pixelGameFontHuge = load_font("assets/PixelGame.otf", 85)
 
+#Sound effects tab
+option_effect = pygame.mixer.Sound("music\option_effect.wav")
+miss_note = pygame.mixer.Sound("music\hit_effect.wav")
+defeat_effect = pygame.mixer.Sound("music\defeat.wav")
+intro_sound = pygame.mixer.Sound("music\intro.wav") 
 
 class Character:
     def __init__(self, x, y, screen_width, screen_height,speed):
@@ -839,6 +844,7 @@ def load_beatmap(filename="beatmap.json"):
     
 def play_intro(screen, clock, font, big_font):
     axel = Character(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2 + 50, SCREEN_WIDTH, SCREEN_HEIGHT, 8)
+    intro_sound.play()
 
     text_lines = [
         "A long time ago...",
@@ -994,9 +1000,11 @@ def show_menu(screen, clock, font, big_font):
                 if event.key == pygame.K_UP:
                     selected_option = (selected_option - 1) % len(options)
                     particles.add_explosion(SCREEN_WIDTH//2, 200 + selected_option * 60, NEON_CYAN)
+                    option_effect.play()
                 elif event.key == pygame.K_DOWN:
                     selected_option = (selected_option + 1) % len(options)
                     particles.add_explosion(SCREEN_WIDTH//2, 200 + selected_option * 60, NEON_CYAN)
+                    option_effect.play()
                 elif event.key == pygame.K_RETURN:
                     level_id, _ = options[selected_option]
                     if level_id == "quit":
@@ -1187,6 +1195,7 @@ def play_level(screen, clock, font, big_font, level_id):
         if health <= 0:
             pygame.mixer.music.stop()
             game_over, paused = True, True
+            defeat_effect.play(loops=0)
 
         # Spawn notes at intervals
         if not paused:
